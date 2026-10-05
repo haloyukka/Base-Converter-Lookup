@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="10進数・16進数・2進数の双方向リアルタイム変換と早見表生成ツール">
+  <title>基数変換ツール (Base Converter)</title>
+  <script>
+    /* 保存済みテーマを描画前に適用（ちらつき防止） */
+    (function () {
+      try {
+        var t = localStorage.getItem('base-converter-theme');
+        if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) { /* localStorage 不可の環境では OS 設定に従う */ }
+    })();
+  </script>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <h1 class="app-title">基数変換ツール <span class="app-subtitle">Base Converter</span></h1>
+    <button id="themeToggle" class="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="ダークモード">
+      <span class="theme-track" aria-hidden="true">
+        <span class="theme-thumb"></span>
+      </span>
+      <span id="themeLabel" class="theme-label">☀️ ライト</span>
+    </button>
+  </header>
+
+  <main class="container">
+    <!-- ===== 個別変換 ===== -->
+    <section class="card" aria-labelledby="convTitle">
+      <div class="card-head">
+        <h2 id="convTitle" class="card-title">個別変換</h2>
+        <div class="options">
+          <label class="option">
+            <span>符号の扱い</span>
+            <select id="signMode">
+              <option value="unsigned" selected>符号なし</option>
+              <option value="signed">符号付き（2の補数）</option>
+            </select>
+          </label>
+          <label class="option">
+            <span>ビット幅</span>
+            <select id="bitWidth">
+              <option value="auto" selected>自動（有効桁数基準）</option>
+              <option value="8">8 bit</option>
+              <option value="16">16 bit</option>
+              <option value="32">32 bit</option>
+              <option value="64">64 bit</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="conv-grid">
+        <!-- DEC -->
+        <div class="conv-row">
+          <label for="decInput" class="conv-label">DEC <small>10進数</small></label>
+          <div class="field">
+            <input id="decInput" class="value-input" type="text" inputmode="numeric"
+                   autocomplete="off" spellcheck="false" maxlength="1100"
+                   placeholder="例: 255 / -1" aria-describedby="decError">
+            <p id="decError" class="field-error" aria-live="polite"></p>
+          </div>
+          <button type="button" class="btn copy-btn" data-target="decInput" data-name="DEC">コピー</button>
+          <div class="digits" aria-hidden="true"></div>
+        </div>
+
+        <!-- HEX -->
+        <div class="conv-row">
+          <label for="hexInput" class="conv-label">HEX <small>16進数</small></label>
+          <div class="field">
+            <input id="hexInput" class="value-input" type="text"
+                   autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="1100"
+                   placeholder="例: FF" aria-describedby="hexError">
+            <p id="hexError" class="field-error" aria-live="polite"></p>
+          </div>
+          <button type="button" class="btn copy-btn" data-target="hexInput" data-name="HEX">コピー</button>
+          <label class="digits">
+            <span>有効桁数</span>
+            <input id="hexDigits" type="number" min="1" max="64" step="1" value="2" inputmode="numeric">
+            <span>桁</span>
+          </label>
+        </div>
+
+        <!-- BIN -->
+        <div class="conv-row">
+          <label for="binInput" class="conv-label">BIN <small>2進数</small></label>
+          <div class="field">
+            <input id="binInput" class="value-input" type="text" inputmode="numeric"
+                   autocomplete="off" spellcheck="false" maxlength="1100"
+                   placeholder="例: 11111111" aria-describedby="binError">
+            <p id="binError" class="field-error" aria-live="polite"></p>
+          </div>
+          <button type="button" class="btn copy-btn" data-target="binInput" data-name="BIN">コピー</button>
+          <label class="digits">
+            <span>有効桁数</span>
+            <input id="binDigits" type="number" min="1" max="256" step="1" value="8" inputmode="numeric">
+            <span>桁</span>
+          </label>
+        </div>
+      </div>
+
+      <p class="hint">
+        負の数は2の補数で表示します。「符号付き」では、HEX/BIN の最上位ビットが 1 の値を負数として解釈します
+        （ビット幅「自動」の場合は 有効桁数 × 1桁あたりのビット数 を基準）。
+      </p>
+    </section>
+
+    <!-- ===== 早見表 ===== -->
+    <section class="card" aria-labelledby="tableTitle">
+      <div class="card-head">
+        <h2 id="tableTitle" class="card-title">早見表</h2>
+      </div>
+
+      <form id="tableForm" class="table-controls" novalidate>
+        <label class="option">
+          <span>開始値</span>
+          <input id="startVal" type="number" step="1" value="0" inputmode="numeric" aria-describedby="tableError">
+        </label>
+        <label class="option">
+          <span>終了値</span>
+          <input id="endVal" type="number" step="1" value="16" inputmode="numeric" aria-describedby="tableError">
+        </label>
+        <button type="submit" class="btn btn-primary">表を生成</button>
+      </form>
+      <p id="tableError" class="field-error" aria-live="polite"></p>
+
+      <div class="export-row">
+        <span class="export-label">エクスポート:</span>
+        <button id="csvBtn" type="button" class="btn">CSVダウンロード</button>
+        <button id="mdBtn" type="button" class="btn">Markdownコピー</button>
+        <span id="rowCount" class="muted" aria-live="polite"></span>
+      </div>
+
+      <div class="table-wrap" tabindex="0" aria-label="早見表（スクロール可能）">
+        <table id="refTable" class="ref-table">
+          <thead>
+            <tr>
+              <th scope="col"># (Dec)</th>
+              <th scope="col">Dec2Hex</th>
+              <th scope="col">Dec2Bin</th>
+              <th scope="col">2<sup>n</sup></th>
+            </tr>
+          </thead>
+          <tbody id="refBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <small>Base Converter &amp; Lookup — 完全クライアントサイドで動作します</small>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
